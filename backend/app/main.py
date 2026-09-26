@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -16,18 +18,29 @@ from .api.operations import router as operations_router
 app = FastAPI(
     title="StockSense API",
     description="Inventory Management System API",
-    version="1.0.0"
+    version="1.0.0",
 )
+
+
+# Frontend URL for production.
+# Locally, Vite runs on port 5173.
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+allowed_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    frontend_url,
+]
+
+# Remove duplicates while preserving order.
+allowed_origins = list(dict.fromkeys(allowed_origins))
 
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:5174"
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,16 +58,17 @@ app.include_router(dashboard_router)
 app.include_router(ledger_router)
 app.include_router(operations_router)
 
+
 @app.get("/")
 def root():
     return {
         "message": "StockSense API is running",
-        "status": "online"
+        "status": "online",
     }
 
 
 @app.get("/health")
 def health():
     return {
-        "status": "healthy"
+        "status": "healthy",
     }
