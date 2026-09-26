@@ -1,12 +1,10 @@
-#StockSense
-
+STOCKSENSE
 Know your stock. Control your inventory. Move smarter.
-
 A modern, real-time Inventory Management System built to replace manual registers, spreadsheets, and scattered inventory tracking with a centralized digital platform.
 
-🌐 Live: www.trikstarevitrace.in
+🌐 www.trikstarevitrace.in
 
-🚀 What is StockSense?
+What is StockSense?
 
 StockSense provides a centralized platform for managing products, stock, warehouses, receipts, deliveries, internal transfers, and inventory adjustments.
 
