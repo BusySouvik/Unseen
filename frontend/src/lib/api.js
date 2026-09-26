@@ -1,4 +1,4 @@
-const API_URL = "http://127.0.0.1:8000";
+﻿const API_URL = "http://127.0.0.1:8000";
 
 async function request(endpoint, options = {}) {
   const response = await fetch(`${API_URL}${endpoint}`, {
@@ -27,7 +27,7 @@ export const api = {
   // Dashboard returns an object, so DON'T unwrap it.
   getDashboard: () => request("/dashboard/"),
 
-  // Lists → return actual arrays
+  // Lists â†’ return actual arrays
   getProducts: () => unwrap(request("/products/")),
 
   getInventory: () => unwrap(request("/inventory/")),
@@ -59,6 +59,12 @@ export const api = {
   getAdjustments: () => unwrap(request("/operations/adjustments")),
 
   // Mutations return their complete response
+  createProduct: (data) =>
+    request("/products/", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
   createReceipt: (data) =>
     request("/receipts/", {
       method: "POST",

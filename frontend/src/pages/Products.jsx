@@ -10,7 +10,9 @@ import {
   XCircle,
   Boxes,
   MapPin,
-  ChevronDown,
+    ChevronDown,
+  Plus,
+  X,
 } from "lucide-react";
 import AppShell from "../components/app/AppShell";
 import { api } from "../lib/api";
@@ -22,6 +24,15 @@ export default function Products() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+    const [showAddProduct, setShowAddProduct] = useState(false);
+  const [savingProduct, setSavingProduct] = useState(false);
+  const [productForm, setProductForm] = useState({
+    name: "",
+    sku: "",
+    category: "",
+    unit: "",
+    reorder_level: "",
+  });
 
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
@@ -55,6 +66,48 @@ export default function Products() {
   const refresh = async () => {
     setRefreshing(true);
     await loadData();
+  };
+
+    const handleCreateProduct = async (e) => {
+    e.preventDefault();
+
+    if (
+      !productForm.name.trim() ||
+      !productForm.sku.trim() ||
+      !productForm.category.trim() ||
+      !productForm.unit.trim()
+    ) {
+      setError("Please fill in all required product fields.");
+      return;
+    }
+
+    try {
+      setSavingProduct(true);
+      setError("");
+
+      await api.createProduct({
+        name: productForm.name.trim(),
+        sku: productForm.sku.trim(),
+        category: productForm.category.trim(),
+        unit: productForm.unit.trim(),
+        reorder_level: Number(productForm.reorder_level || 0),
+      });
+
+      setProductForm({
+        name: "",
+        sku: "",
+        category: "",
+        unit: "",
+        reorder_level: "",
+      });
+
+      setShowAddProduct(false);
+      await loadData();
+    } catch (err) {
+      setError(err.message || "Failed to create product.");
+    } finally {
+      setSavingProduct(false);
+    }
   };
 
   const warehouseMap = useMemo(
@@ -168,17 +221,30 @@ export default function Products() {
               </p>
             </div>
 
-            <button
-              onClick={refresh}
-              disabled={refreshing}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:bg-white/[0.07] disabled:opacity-50"
-            >
-              <RefreshCw
-                size={16}
-                className={refreshing ? "animate-spin" : ""}
-              />
-              Refresh
-            </button>
+            <div className="flex items-center gap-3">
+  <button
+    onClick={() => {
+      setError("");
+      setShowAddProduct(true);
+    }}
+    className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 hover:shadow-lg hover:shadow-cyan-400/20"
+  >
+    <Plus size={16} />
+    Add Product
+  </button>
+
+  <button
+    onClick={refresh}
+    disabled={refreshing}
+    className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:bg-white/[0.07] disabled:opacity-50"
+  >
+    <RefreshCw
+      size={16}
+      className={refreshing ? "animate-spin" : ""}
+    />
+    Refresh
+  </button>
+</div>
           </motion.div>
 
           {/* Stats */}
@@ -474,6 +540,131 @@ export default function Products() {
           </div>
         </div>
       </div>
+        <AnimatePresence>
+        {showAddProduct && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowAddProduct(false);
+              }
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-950 p-6 shadow-2xl shadow-black/50"
+            >
+              <div className="mb-6 flex items-start justify-between">
+                <div>
+                  <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-400">
+                    <Package size={14} />
+                    Inventory
+                  </div>
+
+                  <h2 className="text-xl font-bold text-white">
+                    Add New Product
+                  </h2>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Create a product in your inventory database.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAddProduct(false)}
+                  className="rounded-lg p-2 text-slate-500 transition hover:bg-white/5 hover:text-white"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateProduct} className="space-y-4">
+                <FormField
+                  label="Product Name"
+                  required
+                  value={productForm.name}
+                  onChange={(value) =>
+                    setProductForm((p) => ({ ...p, name: value }))
+                  }
+                  placeholder="e.g. Steel Rods"
+                />
+
+                <FormField
+                  label="SKU / Code"
+                  required
+                  value={productForm.sku}
+                  onChange={(value) =>
+                    setProductForm((p) => ({ ...p, sku: value }))
+                  }
+                  placeholder="e.g. STL-001"
+                />
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <FormField
+                    label="Category"
+                    required
+                    value={productForm.category}
+                    onChange={(value) =>
+                      setProductForm((p) => ({ ...p, category: value }))
+                    }
+                    placeholder="e.g. Raw Material"
+                  />
+
+                  <FormField
+                    label="Unit"
+                    required
+                    value={productForm.unit}
+                    onChange={(value) =>
+                      setProductForm((p) => ({ ...p, unit: value }))
+                    }
+                    placeholder="e.g. kg, pcs, bags"
+                  />
+                </div>
+
+                <FormField
+                  label="Reorder Level"
+                  value={productForm.reorder_level}
+                  onChange={(value) =>
+                    setProductForm((p) => ({
+                      ...p,
+                      reorder_level: value,
+                    }))
+                  }
+                  placeholder="e.g. 20"
+                  type="number"
+                />
+
+                <div className="flex justify-end gap-3 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddProduct(false)}
+                    className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-white/5"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={savingProduct}
+                    className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {savingProduct && (
+                      <RefreshCw size={15} className="animate-spin" />
+                    )}
+                    {savingProduct ? "Creating..." : "Create Product"}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </AppShell>
   );
 }
@@ -602,4 +793,33 @@ function formatNumber(value) {
   return Number(value || 0).toLocaleString("en-IN", {
     maximumFractionDigits: 2,
   });
+}
+
+function FormField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  required = false,
+  type = "text",
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+        {label}
+        {required && (
+          <span className="ml-1 text-cyan-400">*</span>
+        )}
+      </span>
+
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        min={type === "number" ? "0" : undefined}
+        className="h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3.5 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-400/40 focus:ring-2 focus:ring-cyan-400/10"
+      />
+    </label>
+  );
 }

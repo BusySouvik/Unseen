@@ -400,7 +400,7 @@ function AppShell({ children }) {
           </div>
 
           {/* Navigation */}
-          <div className="flex-1 overflow-hidden px-4 py-7">
+          <div className="flex-1 overflow-y-auto px-4 py-7">
 
             <nav className="space-y-1">
               {navigation.map(renderNavItem)}
