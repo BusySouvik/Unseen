@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException
+﻿from fastapi import APIRouter, HTTPException, Depends
 
 from ..database import supabase
-
+from ..auth import get_current_user
 
 router = APIRouter(
     prefix="/inventory",
@@ -10,13 +10,14 @@ router = APIRouter(
 
 
 @router.get("/")
-def get_inventory():
+def get_inventory(current_user=Depends(get_current_user)):
+    user_id = str(current_user.id)
+
     try:
         response = (
             supabase
             .table("inventory")
-            .select(
-                """
+            .select("""
                 id,
                 quantity,
                 product_id,
@@ -32,8 +33,8 @@ def get_inventory():
                     name,
                     location
                 )
-                """
-            )
+            """)
+            .eq("user_id", user_id)
             .execute()
         )
 
@@ -44,7 +45,4 @@ def get_inventory():
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=500, detail=str(e))

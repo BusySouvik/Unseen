@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import {
   ScrollText,
@@ -8,7 +8,6 @@ import {
   ArrowUpFromLine,
   ArrowLeftRight,
   Scale,
-  Package,
   MapPin,
   Filter,
 } from "lucide-react";
@@ -32,7 +31,7 @@ const operationConfig = {
     label: "Transfer",
     icon: ArrowLeftRight,
     className: "text-violet-300 bg-violet-400/10 border-violet-400/15",
-    sign: "→",
+    sign: "â†’",
   },
   ADJUSTMENT: {
     label: "Adjustment",
@@ -44,7 +43,6 @@ const operationConfig = {
 
 export default function Ledger() {
   const [ledger, setLedger] = useState([]);
-  const [products, setProducts] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
 
   const [search, setSearch] = useState("");
@@ -55,18 +53,16 @@ export default function Ledger() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setError("");
 
-      const [ledgerData, productData, warehouseData] = await Promise.all([
+      const [ledgerData, warehouseData] = await Promise.all([
         api.getLedger(),
-        api.getProducts(),
         api.getWarehouses(),
       ]);
 
-      setLedger(ledgerData?.data || []);
-      setProducts(productData || []);
+      setLedger(ledgerData || []);
       setWarehouses(warehouseData || []);
     } catch (e) {
       setError(e.message || "Failed to load stock ledger.");
@@ -74,11 +70,15 @@ export default function Ledger() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    const handle = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+
+    return () => window.clearTimeout(handle);
+  }, [loadData]);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -328,7 +328,7 @@ function LedgerRow({ item, index }) {
             </span>
 
             <span className="w-fit rounded-md bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] text-slate-500">
-              {item.products?.sku || "—"}
+              {item.products?.sku || "â€”"}
             </span>
 
             <span
@@ -488,7 +488,7 @@ function Loading() {
 }
 
 function formatDate(date) {
-  if (!date) return "—";
+  if (!date) return "â€”";
 
   return new Date(date).toLocaleString("en-IN", {
     day: "2-digit",
@@ -497,3 +497,4 @@ function formatDate(date) {
     minute: "2-digit",
   });
 }
+

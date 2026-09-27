@@ -1,5 +1,7 @@
-from fastapi import APIRouter, HTTPException
+﻿from fastapi import APIRouter, HTTPException, Depends
+
 from ..database import supabase
+from ..auth import get_current_user
 
 router = APIRouter(
     prefix="/dashboard",
@@ -8,18 +10,18 @@ router = APIRouter(
 
 
 @router.get("/")
-def get_dashboard():
+def get_dashboard(current_user=Depends(get_current_user)):
+    user_id = str(current_user.id)
 
     try:
-        # Products
         products = (
             supabase
             .table("products")
-            .select("*")
+            .select("id")
+            .eq("user_id", user_id)
             .execute()
         )
 
-        # Inventory
         inventory = (
             supabase
             .table("inventory")
@@ -31,30 +33,31 @@ def get_dashboard():
                 products(name, sku, reorder_level),
                 warehouses(name)
             """)
+            .eq("user_id", user_id)
             .execute()
         )
 
-        # Receipts
         receipts = (
             supabase
             .table("receipts")
             .select("id, status")
+            .eq("user_id", user_id)
             .execute()
         )
 
-        # Deliveries
         deliveries = (
             supabase
             .table("deliveries")
             .select("id, status")
+            .eq("user_id", user_id)
             .execute()
         )
 
-        # Transfers
         transfers = (
             supabase
             .table("transfers")
             .select("id, status")
+            .eq("user_id", user_id)
             .execute()
         )
 
@@ -63,9 +66,7 @@ def get_dashboard():
         out_of_stock = 0
 
         for item in inventory.data:
-
             quantity = float(item["quantity"])
-
             total_stock += quantity
 
             reorder_level = 0
@@ -77,7 +78,6 @@ def get_dashboard():
 
             if quantity == 0:
                 out_of_stock += 1
-
             elif quantity <= reorder_level:
                 low_stock += 1
 
@@ -110,8 +110,4 @@ def get_dashboard():
         }
 
     except Exception as e:
-
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=500, detail=str(e))

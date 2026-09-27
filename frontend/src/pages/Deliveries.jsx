@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ArrowUpFromLine, Package, Warehouse, UserRound, Hash,
@@ -23,7 +23,7 @@ export default function Deliveries() {
   const [showForm,setShowForm]=useState(false);
   const [message,setMessage]=useState(null);
 
-  const loadData=async()=>{
+  const loadData = useCallback(async () => {
     try{
       const [p,w,d,i]=await Promise.all([
         api.getProducts(),
@@ -40,9 +40,15 @@ export default function Deliveries() {
     }finally{
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(()=>{loadData()},[]);
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+
+    return () => window.clearTimeout(handle);
+  }, [loadData]);
 
   const selectedProduct=products.find(p=>p.id===productId);
 

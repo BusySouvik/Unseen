@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+﻿from fastapi import APIRouter, HTTPException, Depends
 
 from ..database import supabase
+from ..auth import get_current_user
 from ..schemas.deliveries import DeliveryCreate
 from ..services.delivery_service import (
     decrease_stock,
@@ -14,44 +15,53 @@ router = APIRouter(
 
 
 @router.post("/")
-def create_delivery(payload: DeliveryCreate):
+def create_delivery(
+    payload: DeliveryCreate,
+    current_user=Depends(get_current_user)
+):
+    user_id = str(current_user.id)
 
     try:
-        # Check product
+        # Verify product belongs to the logged-in user
         product_response = (
             supabase
             .table("products")
             .select("id, name, sku")
             .eq("id", payload.product_id)
+            .eq("user_id", user_id)
+            .limit(1)
             .execute()
         )
 
         if not product_response.data:
             raise HTTPException(
                 status_code=404,
-                detail="Product not found"
+                detail="Product not found."
             )
 
-        # Check warehouse
+        # Verify warehouse belongs to the logged-in user
         warehouse_response = (
             supabase
             .table("warehouses")
             .select("id, name")
             .eq("id", payload.warehouse_id)
+            .eq("user_id", user_id)
+            .limit(1)
             .execute()
         )
 
         if not warehouse_response.data:
             raise HTTPException(
                 status_code=404,
-                detail="Warehouse not found"
+                detail="Warehouse not found."
             )
 
-        # Create delivery
+        # Create delivery owned by the logged-in user
         delivery_response = (
             supabase
             .table("deliveries")
             .insert({
+                "user_id": user_id,
                 "customer": payload.customer,
                 "status": "DONE",
                 "warehouse_id": payload.warehouse_id
@@ -59,27 +69,47 @@ def create_delivery(payload: DeliveryCreate):
             .execute()
         )
 
+        if not delivery_response.data:
+            raise HTTPException(
+                status_code=500,
+                detail="Delivery could not be created."
+            )
+
         delivery = delivery_response.data[0]
 
-        # Add delivery item
-        supabase.table("delivery_items").insert({
-            "delivery_id": delivery["id"],
-            "product_id": payload.product_id,
-            "quantity": payload.quantity
-        }).execute()
-
-        # Decrease inventory
-        inventory = decrease_stock(
-            payload.product_id,
-            payload.warehouse_id,
-            payload.quantity
+        # Create delivery item owned by the logged-in user
+        delivery_item_response = (
+            supabase
+            .table("delivery_items")
+            .insert({
+                "user_id": user_id,
+                "delivery_id": delivery["id"],
+                "product_id": payload.product_id,
+                "quantity": payload.quantity
+            })
+            .execute()
         )
 
-        # Ledger entry
+        if not delivery_item_response.data:
+            raise HTTPException(
+                status_code=500,
+                detail="Delivery item could not be created."
+            )
+
+        # Decrease only this user's inventory
+        inventory = decrease_stock(
+            product_id=payload.product_id,
+            warehouse_id=payload.warehouse_id,
+            quantity=payload.quantity,
+            user_id=user_id
+        )
+
+        # Create ledger entry owned by this user
         ledger = create_delivery_ledger(
             product_id=payload.product_id,
             quantity=payload.quantity,
             warehouse_id=payload.warehouse_id,
+            user_id=user_id,
             reference_id=delivery["id"],
             customer=payload.customer
         )
@@ -100,4 +130,3 @@ def create_delivery(payload: DeliveryCreate):
             status_code=500,
             detail=str(e)
         )
-    

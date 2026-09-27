@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -70,6 +70,11 @@ const operations = [
   },
 ];
 
+const onboardingSession = {
+  userId: null,
+  shown: new Set(),
+  initialized: false,
+};
 const searchItems = [
   {
     name: "Overview",
@@ -139,6 +144,13 @@ function AppShell({ children }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [notifications, setNotifications] = useState([]);
   const [user, setUser] = useState(null);
+  const [onboarding, setOnboarding] = useState({
+    visible: false,
+    step: null,
+  });
+
+  const [workspaceState, setWorkspaceState] = useState(null);
+  const userId = user?.id;
 
   useEffect(() => {
     async function loadUser() {
@@ -148,6 +160,210 @@ function AppShell({ children }) {
 
     loadUser();
   }, []);
+  const onboardingSteps = useMemo(() => [
+    {
+      id: "warehouse",
+      title: "Create your first warehouse",
+      description:
+        "Warehouses are the locations where you store and organize inventory. Create one to start managing stock.",
+      path: "/warehouses",
+      action: "Create Warehouse",
+    },
+    {
+      id: "product",
+      title: "Add your first product",
+      description:
+        "Products are the items you want to track. Add details such as name, SKU, category, unit and reorder level.",
+      path: "/products",
+      action: "Create Product",
+    },
+    {
+      id: "receipt",
+      title: "Receive your first stock",
+      description:
+        "Receipts record incoming goods from a supplier and automatically increase stock in the selected warehouse.",
+      path: "/receipts",
+      action: "Receive Stock",
+    },
+    {
+      id: "transfer",
+      title: "Move stock between warehouses",
+      description:
+        "Transfers let you move inventory between your warehouses while keeping the movement history recorded.",
+      path: "/transfers",
+      action: "Create Transfer",
+    },
+    {
+      id: "delivery",
+      title: "Create your first delivery",
+      description:
+        "Deliveries record outgoing stock and decrease inventory from the selected warehouse.",
+      path: "/deliveries",
+      action: "Create Delivery",
+    },
+    {
+      id: "adjustment",
+      title: "Reconcile your inventory",
+      description:
+        "Adjustments let you compare physical stock with recorded stock and keep your inventory accurate.",
+      path: "/adjustments",
+      action: "Create Adjustment",
+    },
+    {
+      id: "ledger",
+      title: "Explore your stock ledger",
+      description:
+        "The stock ledger gives you a history of inventory movements so you can understand what changed and why.",
+      path: "/ledger",
+      action: "Open Stock Ledger",
+    },
+  ], []);
+
+  const showNextOnboardingStep = useCallback((state) => {
+    if (!userId) return;
+
+    const nextStep = onboardingSteps.find(
+      (step) =>
+        !state?.[step.id] &&
+        !onboardingSession.shown.has(step.id)
+    );
+
+    if (!nextStep) {
+      setOnboarding({
+        visible: false,
+        step: null,
+      });
+
+      return;
+    }
+
+    onboardingSession.shown.add(nextStep.id);
+
+    setOnboarding({
+      visible: true,
+      step: nextStep.id,
+    });
+  }, [onboardingSteps, userId]);
+
+  const initializeOnboarding = useCallback(async () => {
+    if (!userId) return;
+
+    // If this user already initialized onboarding in the
+    // current browser session, NEVER initialize it again
+    // just because the route changed.
+    if (
+      onboardingSession.initialized &&
+      onboardingSession.userId === userId
+    ) {
+      return;
+    }
+
+    // New login/user.
+    if (onboardingSession.userId !== userId) {
+      onboardingSession.userId = userId;
+      onboardingSession.shown = new Set();
+      onboardingSession.initialized = false;
+    }
+
+    try {
+      const [
+        warehouses,
+        products,
+        receipts,
+        transfers,
+        deliveries,
+        adjustments,
+        ledger,
+      ] = await Promise.all([
+        api.getWarehouses(),
+        api.getProducts(),
+        api.getReceipts(),
+        api.getTransfers(),
+        api.getDeliveries(),
+        api.getAdjustments(),
+        api.getLedger(),
+      ]);
+
+      const state = {
+        warehouse:
+          Array.isArray(warehouses) && warehouses.length > 0,
+
+        product:
+          Array.isArray(products) && products.length > 0,
+
+        receipt:
+          Array.isArray(receipts) && receipts.length > 0,
+
+        transfer:
+          Array.isArray(transfers) && transfers.length > 0,
+
+        delivery:
+          Array.isArray(deliveries) && deliveries.length > 0,
+
+        adjustment:
+          Array.isArray(adjustments) && adjustments.length > 0,
+
+        ledger:
+          Array.isArray(ledger) && ledger.length > 0,
+      };
+
+      setWorkspaceState(state);
+
+      onboardingSession.initialized = true;
+
+      showNextOnboardingStep(state);
+    } catch (error) {
+      console.error("Onboarding initialization failed:", error);
+
+      onboardingSession.initialized = true;
+
+      setOnboarding({
+        visible: false,
+        step: null,
+      });
+    }
+  }, [showNextOnboardingStep, userId]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const handle = window.setTimeout(() => {
+      setWorkspaceState(null);
+      setOnboarding({
+        visible: false,
+        step: null,
+      });
+
+      void initializeOnboarding();
+    }, 0);
+
+    return () => window.clearTimeout(handle);
+  }, [initializeOnboarding, user]);
+
+  useEffect(() => {
+    if (!onboarding.visible || !onboarding.step) return;
+
+    const currentStep = onboardingSteps.find(
+      (step) => step.id === onboarding.step
+    );
+
+    if (!currentStep) return;
+
+    const timer = setTimeout(() => {
+      const targets = document.querySelectorAll(
+        `a[href="${currentStep.path}"]`
+      );
+
+      targets.forEach((target) => {
+        target.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      });
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [onboarding.visible, onboarding.step, onboardingSteps]);
 
   useEffect(() => {
     async function loadNotifications() {
@@ -246,6 +462,15 @@ function AppShell({ children }) {
   }, [searchOpen]);
 
   async function handleSignOut() {
+    onboardingSession.userId = null;
+    onboardingSession.shown = new Set();
+    onboardingSession.initialized = false;
+
+    setOnboarding({
+      visible: false,
+      step: null,
+    });
+
     await supabase.auth.signOut();
     navigate("/");
   }
@@ -273,6 +498,38 @@ function AppShell({ children }) {
     .slice(0, 2)
     .toUpperCase();
 
+  const dismissOnboarding = () => {
+    if (!onboarding.step) return;
+
+    setOnboarding({
+      visible: false,
+      step: null,
+    });
+
+    // workspaceState was loaded once during initialization.
+    // Move to the next step without another API request.
+    if (workspaceState) {
+      showNextOnboardingStep(workspaceState);
+    }
+  };
+
+  const goToOnboardingStep = () => {
+    const currentStep = onboardingSteps.find(
+      (step) => step.id === onboarding.step
+    );
+
+    if (!currentStep) return;
+
+    onboardingSession.shown.add(currentStep.id);
+
+    setOnboarding({
+      visible: false,
+      step: null,
+    });
+
+    setMobileOpen(false);
+    navigate(currentStep.path);
+  };
   const renderNavItem = (item) => {
     const Icon = item.icon;
 
@@ -280,14 +537,34 @@ function AppShell({ children }) {
       <NavLink
         key={item.path}
         to={item.path}
-        onClick={() => setMobileOpen(false)}
-        className={({ isActive }) =>
-          `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all ${
-            isActive
-              ? "bg-white/[0.09] text-white"
-              : "text-white/45 hover:bg-white/[0.05] hover:text-white"
-          }`
-        }
+        onClick={() => {
+          setMobileOpen(false);
+
+          if (onboarding.visible) {
+            setOnboarding({
+              visible: false,
+              step: null,
+            });
+          }
+        }}
+        className={({ isActive }) => {
+          const currentOnboardingStep = onboardingSteps.find(
+            (step) => step.id === onboarding.step
+          );
+
+          const isOnboardingTarget =
+            onboarding.visible &&
+            currentOnboardingStep &&
+            item.path === currentOnboardingStep.path;
+
+          return `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all ${
+            isOnboardingTarget
+              ? "relative z-[92] bg-white/[0.20] text-white ring-2 ring-white/70 shadow-[0_0_45px_rgba(255,255,255,0.45)] transition-all duration-200"
+              : isActive
+                ? "bg-white/[0.09] text-white"
+                : "text-white/45 hover:bg-white/[0.05] hover:text-white"
+          }`;
+        }}
       >
         {({ isActive }) => (
           <>
@@ -332,7 +609,7 @@ function AppShell({ children }) {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
-            className="fixed inset-0 z-[90] bg-[#050505] p-6 lg:hidden"
+            className={`fixed inset-0 p-6 lg:hidden ${onboarding.visible ? "z-[91]" : "z-[90]"} bg-[#050505]`}
           >
             <div className="mb-8 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -349,7 +626,16 @@ function AppShell({ children }) {
               </div>
 
               <button
-                onClick={() => setMobileOpen(false)}
+                onClick={() => {
+          setMobileOpen(false);
+
+          if (onboarding.visible) {
+            setOnboarding({
+              visible: false,
+              step: null,
+            });
+          }
+        }}
                 className="rounded-xl p-2 text-white/60 hover:bg-white/5"
               >
                 <X />
@@ -378,7 +664,7 @@ function AppShell({ children }) {
       </AnimatePresence>
 
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[340px] border-r border-white/[0.08] bg-[#050505]/90 backdrop-blur-xl lg:block">
+      <aside className={`fixed inset-y-0 left-0 hidden w-[340px] border-r border-white/[0.08] bg-[#050505]/95 backdrop-blur-xl lg:block ${onboarding.visible ? "z-[91]" : "z-40"}`}>
 
         <div className="flex h-full flex-col">
 
@@ -442,6 +728,88 @@ function AppShell({ children }) {
       </aside>
 
       {/* Main */}
+      {/* Onboarding overlay */}
+      {onboarding.visible && onboarding.step && (
+        <div
+          className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-[3px]"
+          onClick={dismissOnboarding}
+        >
+          {(() => {
+            const currentStep = onboardingSteps.find(
+              (step) => step.id === onboarding.step
+            );
+
+            if (!currentStep) return null;
+
+            return (
+              <div
+                className="fixed left-1/2 top-1/2 z-[92] w-[calc(100%-32px)] max-w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-white/10 bg-[#0b0b0d] p-6 shadow-[0_25px_100px_rgba(0,0,0,0.8)]"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="mb-5 flex items-start gap-4">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-black">
+                    <Activity className="h-5 w-5" />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-cyan-300/70">
+                      Quick setup
+                    </p>
+
+                    <h3 className="text-lg font-semibold text-white">
+                      {currentStep.title}
+                    </h3>
+                  </div>
+                </div>
+
+                <p className="text-sm leading-6 text-white/55">
+                  {currentStep.description}
+                </p>
+
+                <div className="mt-5 flex items-center gap-1.5">
+                  {onboardingSteps.map((step) => (
+                    <div
+                      key={step.id}
+                      className={`h-1 flex-1 rounded-full transition ${
+                        step.id === onboarding.step
+                          ? "bg-white"
+                          : "bg-white/10"
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                <p className="mt-2 text-[10px] text-white/25">
+                  Step{" "}
+                  {onboardingSteps.findIndex(
+                    (step) => step.id === onboarding.step
+                  ) + 1}{" "}
+                  of {onboardingSteps.length}
+                </p>
+
+                <div className="mt-6 flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={dismissOnboarding}
+                    className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-white/45 transition hover:bg-white/[0.06] hover:text-white"
+                  >
+                    Skip
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={goToOnboardingStep}
+                    className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-white/90"
+                  >
+                    {currentStep.action}
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       <main className="relative min-h-screen lg:pl-[340px]">
 
         {/* Topbar */}
@@ -764,6 +1132,16 @@ function AppShell({ children }) {
 }
 
 export default AppShell;
+
+
+
+
+
+
+
+
+
+
 
 
 

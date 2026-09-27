@@ -119,11 +119,6 @@ export default function ForgotPassword() {
     setSuccess(true);
   }
 
-  function handleOtpChange(value) {
-    const cleaned = value.replace(/\D/g, "").slice(0, 6);
-    setOtp(cleaned);
-  }
-
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#050505] text-white">
 

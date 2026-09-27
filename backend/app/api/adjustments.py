@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+﻿from fastapi import APIRouter, HTTPException, Depends
 
 from ..database import supabase
+from ..auth import get_current_user
 from ..schemas.adjustments import AdjustmentCreate
 from ..services.adjustment_service import adjust_stock
 
@@ -11,52 +12,62 @@ router = APIRouter(
 
 
 @router.post("/")
-def create_adjustment(payload: AdjustmentCreate):
+def create_adjustment(
+    payload: AdjustmentCreate,
+    current_user=Depends(get_current_user)
+):
+    user_id = str(current_user.id)
 
     try:
-        # Check product
+        # Verify product belongs to the logged-in user
         product = (
             supabase
             .table("products")
             .select("id, name, sku")
             .eq("id", payload.product_id)
+            .eq("user_id", user_id)
+            .limit(1)
             .execute()
         )
 
         if not product.data:
             raise HTTPException(
                 status_code=404,
-                detail="Product not found"
+                detail="Product not found."
             )
 
-        # Check warehouse
+        # Verify warehouse belongs to the logged-in user
         warehouse = (
             supabase
             .table("warehouses")
             .select("id, name")
             .eq("id", payload.warehouse_id)
+            .eq("user_id", user_id)
+            .limit(1)
             .execute()
         )
 
         if not warehouse.data:
             raise HTTPException(
                 status_code=404,
-                detail="Warehouse not found"
+                detail="Warehouse not found."
             )
 
-        # Adjust inventory
+        # Adjust only this user's inventory
         result = adjust_stock(
             product_id=payload.product_id,
             warehouse_id=payload.warehouse_id,
             counted_quantity=payload.counted_quantity,
-            reason=payload.reason
+            reason=payload.reason,
+            user_id=user_id
         )
 
-        # Save adjustment
+        # Save adjustment owned by this user
         adjustment_response = (
             supabase
             .table("adjustments")
             .insert({
+                "user_id": user_id,
                 "product_id": payload.product_id,
                 "warehouse_id": payload.warehouse_id,
                 "previous_quantity": result["previous_quantity"],
@@ -67,13 +78,20 @@ def create_adjustment(payload: AdjustmentCreate):
             .execute()
         )
 
+        if not adjustment_response.data:
+            raise HTTPException(
+                status_code=500,
+                detail="Adjustment could not be created."
+            )
+
         adjustment = adjustment_response.data[0]
 
-        # Ledger
+        # Create ledger entry owned by this user
         ledger_response = (
             supabase
             .table("stock_ledger")
             .insert({
+                "user_id": user_id,
                 "product_id": payload.product_id,
                 "operation_type": "ADJUSTMENT",
                 "quantity": result["difference"],
@@ -83,6 +101,12 @@ def create_adjustment(payload: AdjustmentCreate):
             })
             .execute()
         )
+
+        if not ledger_response.data:
+            raise HTTPException(
+                status_code=500,
+                detail="Adjustment ledger entry could not be created."
+            )
 
         return {
             "success": True,

@@ -1,18 +1,41 @@
-﻿const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+﻿import { supabase } from "./supabase";
+
+const API_URL =
+  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 async function request(endpoint, options = {}) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const headers = {
+    "Content-Type": "application/json",
+    ...options.headers,
+  };
+
+  if (session?.access_token) {
+    headers.Authorization = `Bearer ${session.access_token}`;
+  }
+
   const response = await fetch(`${API_URL}${endpoint}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
     ...options,
+    headers,
   });
 
-  const data = await response.json();
+  let data;
+
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
 
   if (!response.ok) {
-    throw new Error(data.detail || "Request failed");
+    throw new Error(
+      data?.detail ||
+      data?.message ||
+      "Request failed"
+    );
   }
 
   return data;
@@ -20,19 +43,23 @@ async function request(endpoint, options = {}) {
 
 const unwrap = async (requestPromise) => {
   const response = await requestPromise;
-  return response.data ?? [];
+  return response?.data ?? [];
 };
 
 export const api = {
-  // Dashboard returns an object, so DON'T unwrap it.
   getDashboard: () => request("/dashboard/"),
 
-  // Lists â†’ return actual arrays
   getProducts: () => unwrap(request("/products/")),
 
   getInventory: () => unwrap(request("/inventory/")),
 
   getWarehouses: () => unwrap(request("/warehouses/")),
+
+  createWarehouse: (data) =>
+    request("/warehouses/", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 
   getLedger: async (params = {}) => {
     const query = new URLSearchParams();
@@ -50,15 +77,18 @@ export const api = {
     );
   },
 
-  getReceipts: () => unwrap(request("/operations/receipts")),
+  getReceipts: () =>
+    unwrap(request("/operations/receipts")),
 
-  getDeliveries: () => unwrap(request("/operations/deliveries")),
+  getDeliveries: () =>
+    unwrap(request("/operations/deliveries")),
 
-  getTransfers: () => unwrap(request("/operations/transfers")),
+  getTransfers: () =>
+    unwrap(request("/operations/transfers")),
 
-  getAdjustments: () => unwrap(request("/operations/adjustments")),
+  getAdjustments: () =>
+    unwrap(request("/operations/adjustments")),
 
-  // Mutations return their complete response
   createProduct: (data) =>
     request("/products/", {
       method: "POST",
@@ -75,7 +105,7 @@ export const api = {
     request("/deliveries/", {
       method: "POST",
       body: JSON.stringify(data),
-    }),
+  }),
 
   createTransfer: (data) =>
     request("/transfers/", {
@@ -88,4 +118,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
-};
+
+  updateProduct: (id, data) =>
+    request(`/products/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),};
+
+
+

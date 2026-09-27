@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Scale,
@@ -32,7 +32,7 @@ export default function Adjustments() {
   const [showForm,setShowForm]=useState(false);
   const [message,setMessage]=useState(null);
 
-  const loadData=async()=>{
+  const loadData=useCallback(async()=>{
     try{
       const [p,w,a,i]=await Promise.all([
         api.getProducts(),
@@ -53,9 +53,15 @@ export default function Adjustments() {
     }finally{
       setLoading(false);
     }
-  };
+  },[]);
 
-  useEffect(()=>{loadData()},[]);
+  useEffect(()=>{
+    const handle = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+
+    return () => window.clearTimeout(handle);
+  }, [loadData]);
 
   const selectedProduct=products.find(p=>p.id===productId);
 

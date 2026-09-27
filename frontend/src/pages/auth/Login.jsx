@@ -12,7 +12,6 @@ import {
   ShieldCheck,
   Package,
   Warehouse,
-  ArrowDownToLine,
   Activity,
   Sparkles,
 } from "lucide-react";

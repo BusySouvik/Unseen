@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import {
   Warehouse as WarehouseIcon,
@@ -19,6 +19,39 @@ export default function Warehouses() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [warehouseName, setWarehouseName] = useState("");
+  const [warehouseLocation, setWarehouseLocation] = useState("");
+
+  const createWarehouse = async (e) => {
+    e.preventDefault();
+
+    if (!warehouseName.trim() || !warehouseLocation.trim()) {
+      setError("Warehouse name and location are required.");
+      return;
+    }
+
+    try {
+      setCreating(true);
+      setError("");
+
+      await api.createWarehouse({
+        name: warehouseName.trim(),
+        location: warehouseLocation.trim(),
+      });
+
+      setWarehouseName("");
+      setWarehouseLocation("");
+      setShowCreate(false);
+
+      await loadData();
+    } catch (e) {
+      setError(e.message || "Failed to create warehouse.");
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -115,21 +148,106 @@ export default function Warehouses() {
               </p>
             </div>
 
-            <button
-              onClick={async () => {
-                setRefreshing(true);
-                await loadData();
-              }}
-              disabled={refreshing}
-              className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm text-slate-300 transition hover:bg-white/[0.08] disabled:opacity-50"
-            >
-              <RefreshCw
-                size={15}
-                className={refreshing ? "animate-spin" : ""}
-              />
-              Refresh
-            </button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                onClick={() => setShowCreate(true)}
+                className="flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-white/90"
+              >
+                <WarehouseIcon size={15} />
+                Add Warehouse
+              </button>
+
+              <button
+                onClick={async () => {
+                  setRefreshing(true);
+                  await loadData();
+                }}
+                disabled={refreshing}
+                className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm text-slate-300 transition hover:bg-white/[0.08] disabled:opacity-50"
+              >
+                <RefreshCw
+                  size={15}
+                  className={refreshing ? "animate-spin" : ""}
+                />
+                Refresh
+              </button>
+            </div>
           </motion.div>
+
+          {showCreate && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0b0d12] p-6 shadow-2xl"
+              >
+                <div className="mb-6">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-300">
+                    <WarehouseIcon size={20} />
+                  </div>
+
+                  <h2 className="mt-4 text-xl font-semibold text-white">
+                    Add Warehouse
+                  </h2>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Create a storage location for this workspace.
+                  </p>
+                </div>
+
+                <form onSubmit={createWarehouse} className="space-y-4">
+                  <div>
+                    <label className="mb-2 block text-xs font-medium text-slate-400">
+                      Warehouse Name
+                    </label>
+
+                    <input
+                      value={warehouseName}
+                      onChange={(e) => setWarehouseName(e.target.value)}
+                      placeholder="Main Warehouse"
+                      required
+                      className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-400/40"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-xs font-medium text-slate-400">
+                      Location
+                    </label>
+
+                    <input
+                      value={warehouseLocation}
+                      onChange={(e) => setWarehouseLocation(e.target.value)}
+                      placeholder="Central Storage"
+                      required
+                      className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-400/40"
+                    />
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCreate(false);
+                        setError("");
+                      }}
+                      className="flex-1 rounded-xl border border-white/10 bg-white/[0.04] py-3 text-sm text-slate-300 hover:bg-white/[0.08]"
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="submit"
+                      disabled={creating}
+                      className="flex-1 rounded-xl bg-white py-3 text-sm font-semibold text-black disabled:opacity-50"
+                    >
+                      {creating ? "Creating..." : "Create Warehouse"}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
 
           {/* Overview */}
           <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -355,7 +473,7 @@ export default function Warehouses() {
                         </span>
 
                         <span className="text-slate-500">
-                          {formatNumber(warehouse.totalUnits)} ·{" "}
+                          {formatNumber(warehouse.totalUnits)} Â·{" "}
                           {percentage.toFixed(1)}%
                         </span>
                       </div>
@@ -415,3 +533,4 @@ function formatNumber(value) {
     maximumFractionDigits: 2,
   });
 }
+

@@ -1,15 +1,21 @@
-from fastapi import HTTPException
+﻿from fastapi import HTTPException
 
 from ..database import supabase
 
 
-def get_inventory_record(product_id: str, warehouse_id: str):
+def get_inventory_record(
+    product_id: str,
+    warehouse_id: str,
+    user_id: str
+):
     response = (
         supabase
         .table("inventory")
         .select("*")
         .eq("product_id", product_id)
         .eq("warehouse_id", warehouse_id)
+        .eq("user_id", user_id)
+        .limit(1)
         .execute()
     )
 
@@ -22,7 +28,8 @@ def get_inventory_record(product_id: str, warehouse_id: str):
 def increase_stock(
     product_id: str,
     warehouse_id: str,
-    quantity: float
+    quantity: float,
+    user_id: str
 ):
     if quantity <= 0:
         raise HTTPException(
@@ -32,7 +39,8 @@ def increase_stock(
 
     existing = get_inventory_record(
         product_id,
-        warehouse_id
+        warehouse_id,
+        user_id
     )
 
     if existing:
@@ -46,8 +54,15 @@ def increase_stock(
                 "updated_at": "now()"
             })
             .eq("id", existing["id"])
+            .eq("user_id", user_id)
             .execute()
         )
+
+        if not response.data:
+            raise HTTPException(
+                status_code=500,
+                detail="Inventory could not be updated."
+            )
 
         return response.data[0]
 
@@ -55,12 +70,19 @@ def increase_stock(
         supabase
         .table("inventory")
         .insert({
+            "user_id": user_id,
             "product_id": product_id,
             "warehouse_id": warehouse_id,
             "quantity": quantity
         })
         .execute()
     )
+
+    if not response.data:
+        raise HTTPException(
+            status_code=500,
+            detail="Inventory could not be created."
+        )
 
     return response.data[0]
 
@@ -69,6 +91,7 @@ def create_ledger_entry(
     product_id: str,
     operation_type: str,
     quantity: float,
+    user_id: str,
     from_warehouse_id: str | None = None,
     to_warehouse_id: str | None = None,
     reference_id: str | None = None,
@@ -78,6 +101,7 @@ def create_ledger_entry(
         supabase
         .table("stock_ledger")
         .insert({
+            "user_id": user_id,
             "product_id": product_id,
             "operation_type": operation_type,
             "quantity": quantity,
@@ -88,5 +112,11 @@ def create_ledger_entry(
         })
         .execute()
     )
+
+    if not response.data:
+        raise HTTPException(
+            status_code=500,
+            detail="Ledger entry could not be created."
+        )
 
     return response.data[0]

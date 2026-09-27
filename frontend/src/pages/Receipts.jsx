@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ArrowDownToLine,
@@ -29,7 +29,7 @@ export default function Receipts() {
   const [message, setMessage] = useState(null);
   const [showForm, setShowForm] = useState(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [productData, warehouseData, receiptData] =
         await Promise.all([
@@ -49,11 +49,15 @@ export default function Receipts() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    const handle = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+
+    return () => window.clearTimeout(handle);
+  }, [loadData]);
 
   const submitReceipt = async (e) => {
     e.preventDefault();
@@ -70,7 +74,7 @@ export default function Receipts() {
       setSubmitting(true);
       setMessage(null);
 
-      const result = await api.createReceipt({
+      await api.createReceipt({
         supplier,
         product_id: productId,
         warehouse_id: warehouseId,

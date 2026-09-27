@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ArrowLeftRight,
@@ -10,7 +10,6 @@ import {
   RefreshCw,
   X,
   ArrowRight,
-  Boxes,
 } from "lucide-react";
 import AppShell from "../components/app/AppShell";
 import { api } from "../lib/api";
@@ -31,7 +30,7 @@ export default function Transfers() {
   const [showForm,setShowForm]=useState(false);
   const [message,setMessage]=useState(null);
 
-  const loadData=async()=>{
+  const loadData=useCallback(async()=>{
     try{
       const [p,w,t,i]=await Promise.all([
         api.getProducts(),
@@ -52,9 +51,15 @@ export default function Transfers() {
     }finally{
       setLoading(false);
     }
-  };
+  },[]);
 
-  useEffect(()=>{loadData()},[]);
+  useEffect(()=>{
+    const handle = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+
+    return () => window.clearTimeout(handle);
+  }, [loadData]);
 
   const selectedProduct=products.find(p=>p.id===productId);
 

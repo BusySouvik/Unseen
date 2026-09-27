@@ -1,5 +1,7 @@
-from fastapi import APIRouter, HTTPException
+﻿from fastapi import APIRouter, HTTPException, Depends
+
 from ..database import supabase
+from ..auth import get_current_user
 
 router = APIRouter(
     prefix="/operations",
@@ -8,10 +10,10 @@ router = APIRouter(
 
 
 @router.get("/receipts")
-def get_receipts():
+def get_receipts(current_user=Depends(get_current_user)):
+    user_id = str(current_user.id)
 
     try:
-
         response = (
             supabase
             .table("receipts")
@@ -23,6 +25,7 @@ def get_receipts():
                     products(name, sku, unit)
                 )
             """)
+            .eq("user_id", user_id)
             .order("created_at", desc=True)
             .execute()
         )
@@ -34,18 +37,14 @@ def get_receipts():
         }
 
     except Exception as e:
-
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/deliveries")
-def get_deliveries():
+def get_deliveries(current_user=Depends(get_current_user)):
+    user_id = str(current_user.id)
 
     try:
-
         response = (
             supabase
             .table("deliveries")
@@ -57,6 +56,7 @@ def get_deliveries():
                     products(name, sku, unit)
                 )
             """)
+            .eq("user_id", user_id)
             .order("created_at", desc=True)
             .execute()
         )
@@ -68,18 +68,14 @@ def get_deliveries():
         }
 
     except Exception as e:
-
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/transfers")
-def get_transfers():
+def get_transfers(current_user=Depends(get_current_user)):
+    user_id = str(current_user.id)
 
     try:
-
         response = (
             supabase
             .table("transfers")
@@ -89,6 +85,7 @@ def get_transfers():
                 from_warehouse:warehouses!transfers_from_warehouse_id_fkey(name),
                 to_warehouse:warehouses!transfers_to_warehouse_id_fkey(name)
             """)
+            .eq("user_id", user_id)
             .order("created_at", desc=True)
             .execute()
         )
@@ -100,18 +97,14 @@ def get_transfers():
         }
 
     except Exception as e:
-
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/adjustments")
-def get_adjustments():
+def get_adjustments(current_user=Depends(get_current_user)):
+    user_id = str(current_user.id)
 
     try:
-
         response = (
             supabase
             .table("adjustments")
@@ -120,6 +113,7 @@ def get_adjustments():
                 products(name, sku, unit),
                 warehouses(name)
             """)
+            .eq("user_id", user_id)
             .order("created_at", desc=True)
             .execute()
         )
@@ -131,8 +125,4 @@ def get_adjustments():
         }
 
     except Exception as e:
-
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=500, detail=str(e))

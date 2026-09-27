@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Search,
@@ -26,6 +26,9 @@ export default function Products() {
   const [error, setError] = useState("");
     const [showAddProduct, setShowAddProduct] = useState(false);
   const [savingProduct, setSavingProduct] = useState(false);
+  const [showEditProduct, setShowEditProduct] = useState(false);
+  const [editingProductId, setEditingProductId] = useState(null);
+
   const [productForm, setProductForm] = useState({
     name: "",
     sku: "",
@@ -39,7 +42,7 @@ export default function Products() {
   const [warehouse, setWarehouse] = useState("all");
   const [status, setStatus] = useState("all");
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setError("");
       const [productData, inventoryData, warehouseData] = await Promise.all([
@@ -57,11 +60,15 @@ export default function Products() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    const handle = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+
+    return () => window.clearTimeout(handle);
+  }, [loadData]);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -110,6 +117,82 @@ export default function Products() {
     }
   };
 
+
+  const handleUpdateProduct = async (e) => {
+    e.preventDefault();
+
+    if (
+      !editingProductId ||
+      !productForm.name.trim() ||
+      !productForm.sku.trim() ||
+      !productForm.category.trim() ||
+      !productForm.unit.trim()
+    ) {
+      setError("Please fill in all required product fields.");
+      return;
+    }
+
+    try {
+      setSavingProduct(true);
+      setError("");
+
+      await api.updateProduct(editingProductId, {
+        name: productForm.name.trim(),
+        sku: productForm.sku.trim(),
+        category: productForm.category.trim(),
+        unit: productForm.unit.trim(),
+        reorder_level: Number(productForm.reorder_level || 0),
+      });
+
+      setProductForm({
+        name: "",
+        sku: "",
+        category: "",
+        unit: "",
+        reorder_level: "",
+      });
+
+      setEditingProductId(null);
+      setShowEditProduct(false);
+
+      await loadData();
+    } catch (err) {
+      setError(err.message || "Failed to update product.");
+    } finally {
+      setSavingProduct(false);
+    }
+  };
+
+  const openEditProduct = (product) => {
+    setError("");
+
+    setEditingProductId(product.id);
+
+    setProductForm({
+      name: product.name || "",
+      sku: product.sku || "",
+      category: product.category || "",
+      unit: product.unit || "",
+      reorder_level: product.reorder_level ?? "",
+    });
+
+    setShowEditProduct(true);
+  };
+
+  const closeEditProduct = () => {
+    if (savingProduct) return;
+
+    setShowEditProduct(false);
+    setEditingProductId(null);
+
+    setProductForm({
+      name: "",
+      sku: "",
+      category: "",
+      unit: "",
+      reorder_level: "",
+    });
+  };
   const warehouseMap = useMemo(
     () => Object.fromEntries(warehouses.map((w) => [w.id, w])),
     [warehouses]
@@ -126,23 +209,23 @@ export default function Products() {
     return map;
   }, [inventory]);
 
-  const getProductStock = (product) => {
+  const getProductStock = useCallback((product) => {
     const rows = inventoryByProduct[product.id] || [];
 
     return {
       total: rows.reduce((sum, row) => sum + Number(row.quantity || 0), 0),
       rows,
     };
-  };
+  }, [inventoryByProduct]);
 
-  const getStatus = (product) => {
+  const getStatus = useCallback((product) => {
     const { total } = getProductStock(product);
     const reorder = Number(product.reorder_level || 0);
 
     if (total <= 0) return "out";
     if (total <= reorder) return "low";
     return "healthy";
-  };
+  }, [getProductStock]);
 
   const categories = [...new Set(products.map((p) => p.category).filter(Boolean))];
 
@@ -192,7 +275,7 @@ export default function Products() {
       low,
       out,
     };
-  }, [products, inventoryByProduct]);
+  }, [products, getStatus]);
 
   return (
     <AppShell>
@@ -385,6 +468,7 @@ export default function Products() {
                           Locations
                         </th>
                         <th className="px-5 py-4 font-semibold">Status</th>
+<th className="px-5 py-4 text-right font-semibold">Action</th>
                       </tr>
                     </thead>
 
@@ -422,7 +506,7 @@ export default function Products() {
                               </td>
 
                               <td className="px-5 py-4 text-sm text-slate-300">
-                                {product.category || "�"}
+                                {product.category || "ï¿½"}
                               </td>
 
                               <td className="px-5 py-4">
@@ -450,7 +534,7 @@ export default function Products() {
                                         {warehouseMap[row.warehouse_id]
                                           ?.name || "Unknown"}
                                         <span className="ml-1 text-slate-600">
-                                          � {formatNumber(row.quantity)}
+                                          ï¿½ {formatNumber(row.quantity)}
                                         </span>
                                       </span>
                                     ))
@@ -464,6 +548,16 @@ export default function Products() {
 
                               <td className="px-5 py-4">
                                 <StatusBadge status={productStatus} />
+                              </td>
+
+                              <td className="px-5 py-4 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => openEditProduct(product)}
+                                  className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-cyan-400/30 hover:bg-cyan-400/10 hover:text-cyan-300"
+                                >
+                                  Edit
+                                </button>
                               </td>
                             </motion.tr>
                           );
@@ -527,7 +621,7 @@ export default function Products() {
                             >
                               {warehouseMap[row.warehouse_id]?.name ||
                                 "Unknown"}{" "}
-                              � {formatNumber(row.quantity)}
+                              ï¿½ {formatNumber(row.quantity)}
                             </span>
                           ))}
                         </div>
@@ -541,6 +635,131 @@ export default function Products() {
         </div>
       </div>
         <AnimatePresence>
+        {showEditProduct && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) {
+                closeEditProduct();
+              }
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-950 p-6 shadow-2xl shadow-black/50"
+            >
+              <div className="mb-6 flex items-start justify-between">
+                <div>
+                  <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-400">
+                    <Package size={14} />
+                    Inventory
+                  </div>
+
+                  <h2 className="text-xl font-bold text-white">
+                    Edit Product
+                  </h2>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Update product information and reorder settings.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeEditProduct}
+                  className="rounded-lg p-2 text-slate-500 transition hover:bg-white/5 hover:text-white"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateProduct} className="space-y-4">
+                <FormField
+                  label="Product Name"
+                  required
+                  value={productForm.name}
+                  onChange={(value) =>
+                    setProductForm((p) => ({ ...p, name: value }))
+                  }
+                  placeholder="e.g. Steel Rods"
+                />
+
+                <FormField
+                  label="SKU / Code"
+                  required
+                  value={productForm.sku}
+                  onChange={(value) =>
+                    setProductForm((p) => ({ ...p, sku: value }))
+                  }
+                  placeholder="e.g. STL-001"
+                />
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <FormField
+                    label="Category"
+                    required
+                    value={productForm.category}
+                    onChange={(value) =>
+                      setProductForm((p) => ({ ...p, category: value }))
+                    }
+                    placeholder="e.g. Raw Material"
+                  />
+
+                  <FormField
+                    label="Unit"
+                    required
+                    value={productForm.unit}
+                    onChange={(value) =>
+                      setProductForm((p) => ({ ...p, unit: value }))
+                    }
+                    placeholder="e.g. kg, pcs, bags"
+                  />
+                </div>
+
+                <FormField
+                  label="Reorder Level"
+                  value={productForm.reorder_level}
+                  onChange={(value) =>
+                    setProductForm((p) => ({
+                      ...p,
+                      reorder_level: value,
+                    }))
+                  }
+                  placeholder="e.g. 20"
+                  type="number"
+                />
+
+                <div className="flex justify-end gap-3 pt-3">
+                  <button
+                    type="button"
+                    onClick={closeEditProduct}
+                    disabled={savingProduct}
+                    className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-white/5 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={savingProduct}
+                    className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {savingProduct && (
+                      <RefreshCw size={15} className="animate-spin" />
+                    )}
+
+                    {savingProduct ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
         {showAddProduct && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -823,3 +1042,8 @@ function FormField({
     </label>
   );
 }
+
+
+
+
+

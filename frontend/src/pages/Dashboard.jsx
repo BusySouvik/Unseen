@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import {
   Activity,
@@ -50,7 +50,7 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
-  async function loadDashboard(showRefresh = false) {
+  const loadDashboard = useCallback(async (showRefresh = false) => {
     try {
       if (showRefresh) {
         setRefreshing(true);
@@ -79,11 +79,15 @@ export default function Dashboard() {
       setLoading(false);
       setRefreshing(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
-    loadDashboard();
-  }, []);
+    const handle = window.setTimeout(() => {
+      void loadDashboard();
+    }, 0);
+
+    return () => window.clearTimeout(handle);
+  }, [loadDashboard]);
 
   const lowStockItems = useMemo(() => {
     return inventory
