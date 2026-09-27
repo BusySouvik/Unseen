@@ -506,7 +506,7 @@ export default function Products() {
                               </td>
 
                               <td className="px-5 py-4 text-sm text-slate-300">
-                                {product.category || "ï¿½"}
+                                {product.category || "-"}
                               </td>
 
                               <td className="px-5 py-4">
@@ -534,7 +534,7 @@ export default function Products() {
                                         {warehouseMap[row.warehouse_id]
                                           ?.name || "Unknown"}
                                         <span className="ml-1 text-slate-600">
-                                          ï¿½ {formatNumber(row.quantity)}
+                                          {" - "}{formatNumber(row.quantity)}
                                         </span>
                                       </span>
                                     ))
@@ -621,7 +621,7 @@ export default function Products() {
                             >
                               {warehouseMap[row.warehouse_id]?.name ||
                                 "Unknown"}{" "}
-                              ï¿½ {formatNumber(row.quantity)}
+                              {" - "}{formatNumber(row.quantity)}
                             </span>
                           ))}
                         </div>

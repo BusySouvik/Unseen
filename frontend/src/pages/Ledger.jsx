@@ -31,7 +31,7 @@ const operationConfig = {
     label: "Transfer",
     icon: ArrowLeftRight,
     className: "text-violet-300 bg-violet-400/10 border-violet-400/15",
-    sign: "â†’",
+    sign: "->",
   },
   ADJUSTMENT: {
     label: "Adjustment",
@@ -328,7 +328,7 @@ function LedgerRow({ item, index }) {
             </span>
 
             <span className="w-fit rounded-md bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] text-slate-500">
-              {item.products?.sku || "â€”"}
+              {item.products?.sku || "-"}
             </span>
 
             <span
@@ -488,7 +488,7 @@ function Loading() {
 }
 
 function formatDate(date) {
-  if (!date) return "â€”";
+  if (!date) return "-";
 
   return new Date(date).toLocaleString("en-IN", {
     day: "2-digit",

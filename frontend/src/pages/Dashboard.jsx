@@ -489,7 +489,7 @@ export default function Dashboard() {
                               </p>
 
                               <p className="mt-0.5 text-[9px] text-white/20">
-                                {item.products?.sku || "â€”"}
+                                {item.products?.sku || "-"}
                               </p>
 
                             </div>
@@ -756,7 +756,7 @@ export default function Dashboard() {
                       {operationLabel(
                         item.operation_type
                       )}
-                      {" Â· "}
+                      {" - "}
                       {item.products?.name ||
                         "Product"}
                     </p>
@@ -820,7 +820,7 @@ export default function Dashboard() {
         </span>
 
         <span>
-          Live data Â· Supabase
+          Live data - Supabase
         </span>
 
       </div>
