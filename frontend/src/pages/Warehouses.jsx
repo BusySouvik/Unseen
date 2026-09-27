@@ -473,8 +473,7 @@ export default function Warehouses() {
                         </span>
 
                         <span className="text-slate-500">
-                          {formatNumber(warehouse.totalUnits)} Â·{" "}
-                          {percentage.toFixed(1)}%
+                          {formatNumber(warehouse.totalUnits)} · {percentage.toFixed(1)}%
                         </span>
                       </div>
 
